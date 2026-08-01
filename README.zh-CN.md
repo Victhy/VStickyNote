@@ -4,6 +4,12 @@
 
 轻量 Windows 桌面便签。多开、半透明圆角、Markdown 预览、系统托盘、全局热键与靠近吸附。
 
+## 截图
+
+| 桌面便签 | 托盘菜单 |
+|:---:|:---:|
+| ![桌面便签](docs/screenshots/overview.png) | ![托盘菜单](docs/screenshots/tray-menu.png) |
+
 ## 功能
 
 - **多便签窗口**：无边框、可拖动缩放；透明度 / 圆角 / 颜色 / 字体可调；可置顶

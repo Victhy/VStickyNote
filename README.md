@@ -6,6 +6,12 @@ Lightweight sticky notes for Windows. Multiple notes, translucent rounded window
 
 > Inspired by tools like ATnotes. Intentionally simple: no accounts, no cloud sync.
 
+## Screenshots
+
+| Desktop notes | Tray menu |
+|:---:|:---:|
+| ![Desktop notes](docs/screenshots/overview.png) | ![Tray menu](docs/screenshots/tray-menu.png) |
+
 ## Features
 
 - **Multiple notes**: Borderless, resizable; opacity / corners / color / font adjustable; optional always-on-top
