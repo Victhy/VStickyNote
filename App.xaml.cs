@@ -135,6 +135,14 @@ public partial class App : System.Windows.Application
         };
         newItem.Click += (_, _) => CreateNote();
 
+        var showAllItem = new MenuItem
+        {
+            Header = Loc.T("menu.showAll"),
+            Style = style,
+            Icon = MenuIcons.Glyph(MenuIcons.ShowAll)
+        };
+        showAllItem.Click += (_, _) => ShowAllHiddenNotes();
+
         var languageItem = new MenuItem
         {
             Header = Loc.T("menu.language"),
@@ -221,6 +229,7 @@ public partial class App : System.Windows.Application
         exitItem.Click += (_, _) => ExitApp();
 
         _trayMenu.Items.Add(newItem);
+        _trayMenu.Items.Add(showAllItem);
         _trayMenu.Items.Add(languageItem);
         _trayMenu.Items.Add(new Separator { Style = sep });
         _trayMenu.Items.Add(startItem);
@@ -350,6 +359,7 @@ public partial class App : System.Windows.Application
         win.GetSnapTargets = () => GetSnapTargets(win);
         win.RequestNewNote += _ => CreateNote();
         win.RequestDelete += DeleteNote;
+        win.RequestHide += HideNote;
         win.RequestPersist += () => PersistAll();
         win.Closed += (_, _) =>
         {
@@ -360,6 +370,8 @@ public partial class App : System.Windows.Application
 
         _notes.Add(win);
         win.Show();
+        if (data.IsHidden)
+            win.Hide();
 
         if (persist)
             PersistAll();
@@ -372,11 +384,12 @@ public partial class App : System.Windows.Application
         const double fallbackLeft = 100;
         const double fallbackTop = 100;
 
-        if (_notes.Count == 0)
+        var visible = _notes.Where(n => n.IsVisible).ToList();
+        if (visible.Count == 0)
             return (fallbackLeft, fallbackTop);
 
-        var left = _notes.Min(n => n.Left);
-        var bottom = _notes.Max(n => n.Top + n.ActualHeight);
+        var left = visible.Min(n => n.Left);
+        var bottom = visible.Max(n => n.Top + n.ActualHeight);
         return (left, bottom + gap);
     }
 
@@ -398,10 +411,37 @@ public partial class App : System.Windows.Application
         return list;
     }
 
+    private void HideNote(NoteWindow win)
+    {
+        win.FlushToData();
+        win.Data.IsHidden = true;
+        win.Data.UpdatedAt = DateTime.Now;
+        UpsertStore(win.Data);
+        win.Hide();
+        PersistAll();
+    }
+
+    private void ShowAllHiddenNotes()
+    {
+        foreach (var win in _notes)
+        {
+            if (!win.Data.IsHidden && win.IsVisible)
+                continue;
+
+            win.Data.IsHidden = false;
+            win.Data.UpdatedAt = DateTime.Now;
+            UpsertStore(win.Data);
+            win.Show();
+        }
+
+        PersistAll();
+    }
+
     private void DeleteNote(NoteWindow win)
     {
         SyncWindowToData(win);
         win.Data.IsDeleted = true;
+        win.Data.IsHidden = false;
         win.Data.DeletedAt = DateTime.Now;
         win.Data.UpdatedAt = DateTime.Now;
         UpsertStore(win.Data);

@@ -8,6 +8,8 @@
   "menu.fontSize": "Font size",
   "menu.adjust": "Opacity / corners",
   "menu.topmost": "Pin on top",
+  "menu.hide": "Hide note",
+  "menu.showAll": "Show all hide",
   "menu.delete": "Delete note",
   "menu.exit": "Exit",
   "menu.language": "Language",

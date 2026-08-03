@@ -8,6 +8,8 @@
   "menu.fontSize": "字号",
   "menu.adjust": "外观",
   "menu.topmost": "置顶",
+  "menu.hide": "隐藏便签",
+  "menu.showAll": "显示所有隐藏",
   "menu.delete": "删除便签",
   "menu.exit": "退出",
   "menu.language": "语言",

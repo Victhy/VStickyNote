@@ -16,6 +16,7 @@ public sealed class NoteData
     public string FontFamily { get; set; } = "Microsoft YaHei UI";
     public double FontSize { get; set; } = 14;
     public bool Topmost { get; set; }
+    public bool IsHidden { get; set; }
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.Now;

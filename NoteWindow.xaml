@@ -132,6 +132,11 @@
                       IsChecked="False"
                       Click="Topmost_Click"/>
             <Separator Style="{StaticResource NoteSeparator}"/>
+            <MenuItem x:Name="HideNoteMenuItem"
+                      Header="隐藏便签"
+                      Style="{StaticResource NoteMenuItem}"
+                      Click="HideNote_Click"/>
+            <Separator Style="{StaticResource NoteSeparator}"/>
             <MenuItem x:Name="DeleteMenuItem"
                       Header="删除便签"
                       Style="{StaticResource NoteMenuItem.Danger}"

@@ -42,6 +42,7 @@ public partial class NoteWindow : Window
 
     public event Action<NoteWindow>? RequestNewNote;
     public event Action<NoteWindow>? RequestDelete;
+    public event Action<NoteWindow>? RequestHide;
     public event Action? RequestPersist;
 
     public NoteWindow(NoteData data)
@@ -128,6 +129,7 @@ public partial class NoteWindow : Window
         FontSizeMenu.Header = Loc.T("menu.fontSize");
         AdjustMenuItem.Header = Loc.T("menu.adjust");
         TopmostMenu.Header = Loc.T("menu.topmost");
+        HideNoteMenuItem.Header = Loc.T("menu.hide");
         DeleteMenuItem.Header = Loc.T("menu.delete");
         OpacityLabel.Text = Loc.T("label.opacity");
         CornerLabel.Text = Loc.T("label.corner");
@@ -140,6 +142,7 @@ public partial class NoteWindow : Window
         FontMenu.Icon = MenuIcons.Glyph(MenuIcons.Font);
         FontSizeMenu.Icon = MenuIcons.Glyph(MenuIcons.FontSize);
         AdjustMenuItem.Icon = MenuIcons.Glyph(MenuIcons.Adjust);
+        HideNoteMenuItem.Icon = MenuIcons.Glyph(MenuIcons.Hide);
         DeleteMenuItem.Icon = MenuIcons.DangerGlyph(MenuIcons.Delete);
     }
 
@@ -623,6 +626,8 @@ public partial class NoteWindow : Window
     }
 
     private void NewNote_Click(object sender, RoutedEventArgs e) => RequestNewNote?.Invoke(this);
+
+    private void HideNote_Click(object sender, RoutedEventArgs e) => RequestHide?.Invoke(this);
 
     private void Delete_Click(object sender, RoutedEventArgs e) => RequestDelete?.Invoke(this);
 
