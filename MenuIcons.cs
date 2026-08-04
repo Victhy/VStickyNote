@@ -28,6 +28,8 @@ internal static class MenuIcons
     public const string Snap = "\uE8A7";
     public const string Hide = "\uED1A";
     public const string ShowAll = "\uE8F1";
+    public const string Badge = "\uE73F";
+    public const string StayOpen = "\uE840";
 
     public static FrameworkElement Glyph(string code, MediaBrush? brush = null) =>
         new TextBlock

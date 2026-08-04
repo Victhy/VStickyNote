@@ -23,10 +23,15 @@ public static class MarkdownRenderer
         .UseSoftlineBreakAsHardlineBreak()
         .Build();
 
-    public static FlowDocument ToFlowDocument(string? markdown, string fontFamily, double fontSize)
+    public static FlowDocument ToFlowDocument(
+        string? markdown,
+        string fontFamily,
+        double fontSize,
+        MediaColor? foregroundColor = null)
     {
         var family = new MediaFontFamily(fontFamily);
-        var foreground = new SolidColorBrush(MediaColor.FromArgb(0xDD, 0x00, 0x00, 0x00));
+        var fg = foregroundColor ?? MediaColor.FromArgb(0xDD, 0x00, 0x00, 0x00);
+        var foreground = new SolidColorBrush(fg);
         var doc = new FlowDocument
         {
             FontFamily = family,

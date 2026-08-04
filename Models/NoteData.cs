@@ -16,6 +16,10 @@ public sealed class NoteData
     public string FontFamily { get; set; } = "Microsoft YaHei UI";
     public double FontSize { get; set; } = 14;
     public bool Topmost { get; set; }
+    /// <summary>角标模式：收起为胶囊条，点击可临时展开。</summary>
+    public bool IsBadge { get; set; }
+    /// <summary>角标模式下保持展开，失焦不自动收起。</summary>
+    public bool BadgeStayOpen { get; set; }
     public bool IsHidden { get; set; }
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAt { get; set; }

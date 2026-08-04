@@ -19,7 +19,8 @@
         Deactivated="Window_Deactivated">
 
     <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="0"
+        <WindowChrome x:Name="Chrome"
+                      CaptionHeight="0"
                       ResizeBorderThickness="6"
                       GlassFrameThickness="0"
                       CornerRadius="0"
@@ -33,80 +34,130 @@
             Cursor="Arrow"
             MouseRightButtonUp="Root_MouseRightButtonUp">
         <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+            <Grid x:Name="NoteContentGrid">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" Margin="12">
-                <!-- 预览：Markdown 渲染 -->
-                <FlowDocumentScrollViewer x:Name="PreviewViewer"
-                                          VerticalScrollBarVisibility="Hidden"
-                                          HorizontalScrollBarVisibility="Disabled"
-                                          IsToolBarVisible="False"
-                                          Background="Transparent"
-                                          Focusable="False"
-                                          Cursor="Arrow"
-                                          PreviewMouseLeftButtonDown="Preview_PreviewMouseLeftButtonDown"
-                                          PreviewMouseMove="Preview_PreviewMouseMove"
-                                          PreviewMouseLeftButtonUp="Preview_PreviewMouseLeftButtonUp"
-                                          PreviewMouseRightButtonUp="Root_MouseRightButtonUp"/>
+                <Grid Grid.Row="0" Margin="12">
+                    <!-- 预览：Markdown 渲染 -->
+                    <FlowDocumentScrollViewer x:Name="PreviewViewer"
+                                              VerticalScrollBarVisibility="Hidden"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              IsToolBarVisible="False"
+                                              Background="Transparent"
+                                              Focusable="False"
+                                              Cursor="Arrow"
+                                              PreviewMouseLeftButtonDown="Preview_PreviewMouseLeftButtonDown"
+                                              PreviewMouseMove="Preview_PreviewMouseMove"
+                                              PreviewMouseLeftButtonUp="Preview_PreviewMouseLeftButtonUp"
+                                              PreviewMouseRightButtonUp="Root_MouseRightButtonUp"/>
 
-                <!-- 编辑：Markdown 源码 -->
-                <TextBox x:Name="BodyBox"
-                         Visibility="Collapsed"
-                         AcceptsReturn="True"
-                         AcceptsTab="True"
-                         TextWrapping="Wrap"
-                         VerticalScrollBarVisibility="Hidden"
-                         HorizontalScrollBarVisibility="Disabled"
-                         BorderThickness="0"
-                         Background="Transparent"
-                         CaretBrush="#DD000000"
-                         Foreground="#DD000000"
-                         FontSize="14"
-                         FontFamily="Microsoft YaHei UI"
-                         Cursor="IBeam"
-                         InputMethod.IsInputMethodEnabled="True"
-                         TextChanged="BodyBox_TextChanged"
-                         PreviewMouseRightButtonUp="Root_MouseRightButtonUp"
-                         LostKeyboardFocus="BodyBox_LostKeyboardFocus"/>
+                    <!-- 编辑：Markdown 源码 -->
+                    <TextBox x:Name="BodyBox"
+                             Visibility="Collapsed"
+                             AcceptsReturn="True"
+                             AcceptsTab="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Hidden"
+                             HorizontalScrollBarVisibility="Disabled"
+                             BorderThickness="0"
+                             Background="Transparent"
+                             CaretBrush="#DD000000"
+                             Foreground="#DD000000"
+                             FontSize="14"
+                             FontFamily="Microsoft YaHei UI"
+                             Cursor="IBeam"
+                             InputMethod.IsInputMethodEnabled="True"
+                             TextChanged="BodyBox_TextChanged"
+                             PreviewMouseRightButtonUp="Root_MouseRightButtonUp"
+                             LostKeyboardFocus="BodyBox_LostKeyboardFocus"/>
+                </Grid>
+
+                <Border Grid.Row="1"
+                        Background="Transparent"
+                        Padding="12,0,12,10"
+                        Visibility="Collapsed"
+                        x:Name="QuickPanel">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="OpacityLabel"
+                                   Text="透明"
+                                   VerticalAlignment="Center"
+                                   FontSize="11"
+                                   Foreground="#99000000"
+                                   Margin="0,0,6,0"/>
+                        <Slider x:Name="OpacitySlider" Grid.Column="1"
+                                Minimum="0.2" Maximum="1" Value="0.92"
+                                VerticalAlignment="Center"
+                                ValueChanged="OpacitySlider_ValueChanged"/>
+                        <TextBlock x:Name="CornerLabel"
+                                   Text="圆角"
+                                   Grid.Column="2"
+                                   VerticalAlignment="Center"
+                                   FontSize="11"
+                                   Foreground="#99000000"
+                                   Margin="8,0,6,0"/>
+                        <Slider x:Name="RadiusSlider" Grid.Column="3"
+                                Minimum="0" Maximum="28" Value="12"
+                                VerticalAlignment="Center"
+                                ValueChanged="RadiusSlider_ValueChanged"/>
+                    </Grid>
+                </Border>
+
+                <!-- 胶囊便签展开时：右上角保持展开 -->
+                <Border x:Name="StayOpenPinButton"
+                        Grid.Row="0"
+                        Width="26" Height="26"
+                        Margin="0,4,6,0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Background="Transparent"
+                        Cursor="Hand"
+                        Visibility="Collapsed"
+                        ToolTip="保持展开"
+                        PreviewMouseLeftButtonDown="StayOpenPin_PreviewMouseLeftButtonDown"
+                        MouseLeftButtonUp="StayOpenPin_MouseLeftButtonUp">
+                    <TextBlock x:Name="StayOpenPinGlyph"
+                               Text="&#xE840;"
+                               FontFamily="Segoe MDL2 Assets"
+                               FontSize="14"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Foreground="#99000000"
+                               RenderTransformOrigin="0.5,0.5">
+                        <TextBlock.RenderTransform>
+                            <RotateTransform x:Name="StayOpenPinRotate" Angle="45"/>
+                        </TextBlock.RenderTransform>
+                    </TextBlock>
+                </Border>
             </Grid>
 
-            <Border Grid.Row="1"
-                    Background="Transparent"
-                    Padding="12,0,12,10"
+            <!-- 角标胶囊条 -->
+            <Border x:Name="BadgeBar"
                     Visibility="Collapsed"
-                    x:Name="QuickPanel">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock x:Name="OpacityLabel"
-                               Text="透明"
-                               VerticalAlignment="Center"
-                               FontSize="11"
-                               Foreground="#99000000"
-                               Margin="0,0,6,0"/>
-                    <Slider x:Name="OpacitySlider" Grid.Column="1"
-                            Minimum="0.2" Maximum="1" Value="0.92"
-                            VerticalAlignment="Center"
-                            ValueChanged="OpacitySlider_ValueChanged"/>
-                    <TextBlock x:Name="CornerLabel"
-                               Text="圆角"
-                               Grid.Column="2"
-                               VerticalAlignment="Center"
-                               FontSize="11"
-                               Foreground="#99000000"
-                               Margin="8,0,6,0"/>
-                    <Slider x:Name="RadiusSlider" Grid.Column="3"
-                            Minimum="0" Maximum="28" Value="12"
-                            VerticalAlignment="Center"
-                            ValueChanged="RadiusSlider_ValueChanged"/>
-                </Grid>
+                    Height="30"
+                    Padding="12,0"
+                    Cursor="Hand"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    MouseLeftButtonDown="Badge_MouseLeftButtonDown"
+                    MouseMove="Badge_MouseMove"
+                    MouseLeftButtonUp="Badge_MouseLeftButtonUp"
+                    MouseRightButtonUp="Root_MouseRightButtonUp">
+                <TextBlock x:Name="BadgeLabel"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           FontFamily="Microsoft YaHei UI"
+                           Foreground="#DD000000"
+                           TextTrimming="CharacterEllipsis"
+                           TextWrapping="NoWrap"/>
             </Border>
         </Grid>
     </Border>
@@ -131,6 +182,11 @@
                       IsCheckable="True"
                       IsChecked="False"
                       Click="Topmost_Click"/>
+            <Separator Style="{StaticResource NoteSeparator}"/>
+            <MenuItem x:Name="BadgeModeMenuItem"
+                      Header="收起为角标"
+                      Style="{StaticResource NoteMenuItem}"
+                      Click="BadgeMode_Click"/>
             <Separator Style="{StaticResource NoteSeparator}"/>
             <MenuItem x:Name="HideNoteMenuItem"
                       Header="隐藏便签"

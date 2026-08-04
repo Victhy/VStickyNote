@@ -23,17 +23,28 @@ public partial class NoteWindow : Window
     private const int WsExAppWindow = 0x00040000;
     private const int WsExToolWindow = 0x00000080;
 
+    private const double NormalMinWidth = 160;
+    private const double NormalMinHeight = 70;
+    /// <summary>角标胶囊固定尺寸（宽:高 ≈ 3.2:1）。</summary>
+    private const double BadgeWidth = 56;
+    private const double BadgeHeight = 30;
+    private const double ResizeBorder = 6;
+
     private readonly DispatcherTimer _saveTimer;
     private readonly DispatcherTimer _focusExitTimer;
     private bool _suppressEvents;
     private bool _isEditing;
     private bool _pendingDrag;
+    private bool _pendingBadgeClick;
     private bool _isSnapDragging;
     private bool _suppressLocationSave;
     private bool _imeComposing;
+    private bool _badgeExpanded;
     private Point _dragOrigin;
     private Point _dragMouseOriginDip;
     private Point _dragWindowOrigin;
+
+    private bool IsBadgeCollapsed => Data.IsBadge && !_badgeExpanded;
 
     public NoteData Data { get; }
 
@@ -62,6 +73,7 @@ public partial class NoteWindow : Window
         BuildColorMenus();
         BuildFontMenus();
         ApplyLocalization();
+        NoteMenu.Closed += NoteMenu_Closed;
 
         Loc.Changed += OnLanguageChanged;
 
@@ -133,6 +145,10 @@ public partial class NoteWindow : Window
         DeleteMenuItem.Header = Loc.T("menu.delete");
         OpacityLabel.Text = Loc.T("label.opacity");
         CornerLabel.Text = Loc.T("label.corner");
+        StayOpenPinButton.ToolTip = Loc.T("menu.badgeStayOpen");
+        UpdateBadgeMenuUi();
+        if (IsBadgeCollapsed)
+            UpdateBadgeLabel();
     }
 
     private void AssignMenuIcons()
@@ -142,8 +158,36 @@ public partial class NoteWindow : Window
         FontMenu.Icon = MenuIcons.Glyph(MenuIcons.Font);
         FontSizeMenu.Icon = MenuIcons.Glyph(MenuIcons.FontSize);
         AdjustMenuItem.Icon = MenuIcons.Glyph(MenuIcons.Adjust);
+        BadgeModeMenuItem.Icon = MenuIcons.Glyph(MenuIcons.Badge);
         HideNoteMenuItem.Icon = MenuIcons.Glyph(MenuIcons.Hide);
         DeleteMenuItem.Icon = MenuIcons.DangerGlyph(MenuIcons.Delete);
+    }
+
+    private void UpdateBadgeMenuUi()
+    {
+        if (Data.IsBadge)
+        {
+            BadgeModeMenuItem.Header = Loc.T("menu.unbadge");
+            BadgeModeMenuItem.Icon = MenuIcons.Glyph(MenuIcons.Restore);
+        }
+        else
+        {
+            BadgeModeMenuItem.Header = Loc.T("menu.badge");
+            BadgeModeMenuItem.Icon = MenuIcons.Glyph(MenuIcons.Badge);
+        }
+
+        UpdateStayOpenPinUi();
+    }
+
+    private void UpdateStayOpenPinUi()
+    {
+        var show = Data.IsBadge && _badgeExpanded;
+        StayOpenPinButton.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (!show) return;
+
+        StayOpenPinGlyph.Foreground = new SolidColorBrush(
+            NotePalette.ForegroundFor(Data.ColorHex, Data.Opacity));
+        StayOpenPinRotate.Angle = Data.BadgeStayOpen ? 0 : 45;
     }
 
     private void BuildColorMenus()
@@ -235,6 +279,7 @@ public partial class NoteWindow : Window
         BuildColorMenus();
         BuildFontMenus();
         SyncFontMenuChecks();
+        UpdateBadgeMenuUi();
         NoteMenu.PlacementTarget = this;
         NoteMenu.IsOpen = true;
         e.Handled = true;
@@ -256,8 +301,8 @@ public partial class NoteWindow : Window
         {
             Left = Data.Left;
             Top = Data.Top;
-            Width = Data.Width;
-            Height = Data.Height;
+            Width = Math.Max(Data.Width, NormalMinWidth);
+            Height = Math.Max(Data.Height, NormalMinHeight);
             Topmost = Data.Topmost;
             TopmostMenu.IsChecked = Data.Topmost;
             BodyBox.Text = Data.Text ?? string.Empty;
@@ -265,6 +310,18 @@ public partial class NoteWindow : Window
             RadiusSlider.Value = Data.CornerRadius;
             ApplyAppearance();
             SyncFontMenuChecks();
+            UpdateBadgeMenuUi();
+
+            if (Data.IsBadge)
+            {
+                _badgeExpanded = false;
+                ShowBadgeCollapsedVisual();
+            }
+            else
+            {
+                _badgeExpanded = false;
+                ShowNormalContentVisual();
+            }
         }
         finally
         {
@@ -274,16 +331,30 @@ public partial class NoteWindow : Window
 
     private void ApplyAppearance()
     {
-        var radius = Data.CornerRadius;
+        var radius = IsBadgeCollapsed
+            ? (ActualHeight > 1 ? ActualHeight / 2 : BadgeHeight / 2)
+            : Data.CornerRadius;
         RootBorder.CornerRadius = new CornerRadius(radius);
         var baseColor = (MediaColor)System.Windows.Media.ColorConverter.ConvertFromString(Data.ColorHex)!;
         var alpha = (byte)Math.Clamp((int)Math.Round(Data.Opacity * 255), 40, 255);
         RootBorder.Background = new SolidColorBrush(MediaColor.FromArgb(alpha, baseColor.R, baseColor.G, baseColor.B));
 
+        var fg = NotePalette.ForegroundFor(Data.ColorHex, Data.Opacity);
+        var muted = NotePalette.MutedForegroundFor(Data.ColorHex, Data.Opacity);
+        var fgBrush = new SolidColorBrush(fg);
+        var mutedBrush = new SolidColorBrush(muted);
+
         BodyBox.FontFamily = new MediaFontFamily(Data.FontFamily);
         BodyBox.FontSize = Data.FontSize;
+        BodyBox.Foreground = fgBrush;
+        BodyBox.CaretBrush = fgBrush;
+        BadgeLabel.FontFamily = BodyBox.FontFamily;
+        BadgeLabel.Foreground = fgBrush;
+        OpacityLabel.Foreground = mutedBrush;
+        CornerLabel.Foreground = mutedBrush;
+        UpdateStayOpenPinUi();
 
-        if (!_isEditing)
+        if (!_isEditing && !IsBadgeCollapsed)
             RefreshPreview();
 
         UpdateCornerClip();
@@ -291,7 +362,11 @@ public partial class NoteWindow : Window
 
     private void RefreshPreview()
     {
-        PreviewViewer.Document = MarkdownRenderer.ToFlowDocument(BodyBox.Text, Data.FontFamily, Data.FontSize);
+        PreviewViewer.Document = MarkdownRenderer.ToFlowDocument(
+            BodyBox.Text,
+            Data.FontFamily,
+            Data.FontSize,
+            NotePalette.ForegroundFor(Data.ColorHex, Data.Opacity));
     }
 
     private void UpdateCornerClip()
@@ -299,7 +374,9 @@ public partial class NoteWindow : Window
         if (RootBorder.ActualWidth <= 0 || RootBorder.ActualHeight <= 0)
             return;
 
-        var radius = Data.CornerRadius;
+        var radius = IsBadgeCollapsed
+            ? RootBorder.ActualHeight / 2
+            : Data.CornerRadius;
         RootBorder.Clip = new RectangleGeometry(
             new Rect(0, 0, RootBorder.ActualWidth, RootBorder.ActualHeight),
             radius,
@@ -312,8 +389,12 @@ public partial class NoteWindow : Window
     {
         Data.Left = Left;
         Data.Top = Top;
-        Data.Width = Width;
-        Data.Height = Height;
+        if (!IsBadgeCollapsed)
+        {
+            Data.Width = Width;
+            Data.Height = Height;
+        }
+
         Data.Text = BodyBox.Text;
         Data.Opacity = OpacitySlider.Value;
         Data.CornerRadius = RadiusSlider.Value;
@@ -337,7 +418,7 @@ public partial class NoteWindow : Window
 
     private void EnterEditMode()
     {
-        if (_isEditing) return;
+        if (_isEditing || IsBadgeCollapsed) return;
         _focusExitTimer.Stop();
         _isEditing = true;
         _pendingDrag = false;
@@ -413,7 +494,7 @@ public partial class NoteWindow : Window
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (_isEditing || e.ChangedButton != MouseButton.Left) return;
+        if (_isEditing || IsBadgeCollapsed || e.ChangedButton != MouseButton.Left) return;
         if (e.ClickCount >= 2)
         {
             EnterEditMode();
@@ -561,11 +642,30 @@ public partial class NoteWindow : Window
         {
             if (IsActive) return;
             if (_imeComposing) return;
+            if (NoteMenu.IsOpen) return;
 
-            HideQuickPanel();
-            if (_isEditing)
-                ExitEditMode();
+            ApplyDeactivateSideEffects();
         });
+    }
+
+    private void NoteMenu_Closed(object sender, RoutedEventArgs e)
+    {
+        Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () =>
+        {
+            if (IsActive) return;
+            if (_imeComposing) return;
+            ApplyDeactivateSideEffects();
+        });
+    }
+
+    private void ApplyDeactivateSideEffects()
+    {
+        HideQuickPanel();
+        if (_isEditing)
+            ExitEditMode();
+
+        if (Data.IsBadge && _badgeExpanded && !Data.BadgeStayOpen)
+            CollapseBadge();
     }
 
     private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -575,12 +675,18 @@ public partial class NoteWindow : Window
             if (_isEditing)
                 ExitEditMode();
             HideQuickPanel();
+
+            if (Data.IsBadge && _badgeExpanded && !Data.BadgeStayOpen)
+                CollapseBadge();
+
             e.Handled = true;
         }
     }
 
     private void ToggleQuickPanel_Click(object sender, RoutedEventArgs e)
     {
+        if (IsBadgeCollapsed) return;
+
         QuickPanel.Visibility = QuickPanel.Visibility == Visibility.Visible
             ? Visibility.Collapsed
             : Visibility.Visible;
@@ -623,6 +729,203 @@ public partial class NoteWindow : Window
         Topmost = TopmostMenu.IsChecked == true;
         Data.Topmost = Topmost;
         ScheduleSave();
+    }
+
+    private void StayOpenPin_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+    }
+
+    private void StayOpenPin_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!Data.IsBadge || !_badgeExpanded) return;
+
+        Data.BadgeStayOpen = !Data.BadgeStayOpen;
+        UpdateStayOpenPinUi();
+        ScheduleSave();
+        e.Handled = true;
+    }
+
+    private void BadgeMode_Click(object sender, RoutedEventArgs e)
+    {
+        if (Data.IsBadge)
+            ExitBadgeMode();
+        else
+            EnterBadgeMode();
+    }
+
+    private void EnterBadgeMode()
+    {
+        if (Data.IsBadge) return;
+
+        SyncToModel();
+        Data.IsBadge = true;
+        _badgeExpanded = false;
+        ShowBadgeCollapsedVisual();
+        ScheduleSave();
+    }
+
+    private void ExitBadgeMode()
+    {
+        if (!Data.IsBadge) return;
+
+        var wasCollapsed = IsBadgeCollapsed;
+        Data.IsBadge = false;
+        _badgeExpanded = false;
+
+        if (wasCollapsed)
+            ShowNormalContentVisual();
+        else
+        {
+            ApplyAppearance();
+            UpdateBadgeMenuUi();
+        }
+
+        ScheduleSave();
+    }
+
+    private void ExpandBadgeTemporarily()
+    {
+        if (!Data.IsBadge || _badgeExpanded) return;
+
+        _badgeExpanded = true;
+        ShowNormalContentVisual();
+        Activate();
+    }
+
+    private void CollapseBadge()
+    {
+        if (!Data.IsBadge || !_badgeExpanded) return;
+
+        SyncToModel();
+        _badgeExpanded = false;
+        ShowBadgeCollapsedVisual();
+        ScheduleSave();
+    }
+
+    private void ShowNormalContentVisual()
+    {
+        BadgeBar.Visibility = Visibility.Collapsed;
+        NoteContentGrid.Visibility = Visibility.Visible;
+        ResizeMode = ResizeMode.CanResize;
+        Chrome.ResizeBorderThickness = new Thickness(ResizeBorder);
+        MinWidth = NormalMinWidth;
+        MinHeight = NormalMinHeight;
+
+        var restoreSuppress = _suppressEvents;
+        _suppressEvents = true;
+        try
+        {
+            Width = Math.Max(Data.Width, NormalMinWidth);
+            Height = Math.Max(Data.Height, NormalMinHeight);
+        }
+        finally
+        {
+            _suppressEvents = restoreSuppress;
+        }
+
+        ApplyAppearance();
+        if (!_isEditing)
+            ShowPreviewMode();
+        UpdateBadgeMenuUi();
+    }
+
+    private void ShowBadgeCollapsedVisual()
+    {
+        HideQuickPanel();
+        if (_isEditing)
+        {
+            _isEditing = false;
+            _imeComposing = false;
+            BodyBox.Visibility = Visibility.Collapsed;
+            PreviewViewer.Visibility = Visibility.Visible;
+        }
+
+        NoteContentGrid.Visibility = Visibility.Collapsed;
+        BadgeBar.Visibility = Visibility.Visible;
+        UpdateBadgeLabel();
+
+        ResizeMode = ResizeMode.NoResize;
+        Chrome.ResizeBorderThickness = new Thickness(0);
+        MinWidth = 40;
+        MinHeight = 20;
+
+        UpdateBadgeLabel();
+        var restoreSuppress = _suppressEvents;
+        _suppressEvents = true;
+        try
+        {
+            Width = BadgeWidth;
+            Height = BadgeHeight;
+        }
+        finally
+        {
+            _suppressEvents = restoreSuppress;
+        }
+
+        var radius = BadgeHeight / 2;
+        RootBorder.CornerRadius = new CornerRadius(radius);
+        UpdateCornerClip();
+        UpdateBadgeMenuUi();
+    }
+
+    private void UpdateBadgeLabel()
+    {
+        var raw = BodyBox.Text ?? Data.Text ?? string.Empty;
+        var line = raw.Replace("\r\n", "\n")
+            .Split('\n')
+            .Select(static l => l.Trim())
+            .FirstOrDefault(static l => l.Length > 0);
+
+        BadgeLabel.Text = string.IsNullOrEmpty(line)
+            ? Loc.T("badge.empty")
+            : StripMarkdownLite(line);
+    }
+
+    private static string StripMarkdownLite(string text)
+    {
+        if (text.StartsWith('#'))
+            text = text.TrimStart('#').TrimStart();
+        if (text.StartsWith("- ", StringComparison.Ordinal) || text.StartsWith("* ", StringComparison.Ordinal))
+            text = text[2..];
+        return text.Trim('*', '_', '`', ' ');
+    }
+
+    private void Badge_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!IsBadgeCollapsed || e.ChangedButton != MouseButton.Left) return;
+
+        _pendingBadgeClick = true;
+        _dragOrigin = e.GetPosition(this);
+        BadgeBar.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void Badge_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_pendingBadgeClick || !IsBadgeCollapsed) return;
+        if (e.LeftButton != MouseButtonState.Pressed) return;
+
+        var delta = e.GetPosition(this) - _dragOrigin;
+        if (delta.LengthSquared > 16)
+        {
+            _pendingBadgeClick = false;
+            if (BadgeBar.IsMouseCaptured)
+                BadgeBar.ReleaseMouseCapture();
+            BeginSnapDrag();
+        }
+    }
+
+    private void Badge_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_pendingBadgeClick) return;
+
+        _pendingBadgeClick = false;
+        if (BadgeBar.IsMouseCaptured)
+            BadgeBar.ReleaseMouseCapture();
+
+        ExpandBadgeTemporarily();
+        e.Handled = true;
     }
 
     private void NewNote_Click(object sender, RoutedEventArgs e) => RequestNewNote?.Invoke(this);

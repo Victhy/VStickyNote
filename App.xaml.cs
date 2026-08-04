@@ -460,14 +460,7 @@ public partial class App : System.Windows.Application
             _store.Add(data);
     }
 
-    private static void SyncWindowToData(NoteWindow win)
-    {
-        win.Data.Left = win.Left;
-        win.Data.Top = win.Top;
-        win.Data.Width = win.Width;
-        win.Data.Height = win.Height;
-        win.Data.UpdatedAt = DateTime.Now;
-    }
+    private static void SyncWindowToData(NoteWindow win) => win.FlushToData();
 
     private string PickColor()
     {
