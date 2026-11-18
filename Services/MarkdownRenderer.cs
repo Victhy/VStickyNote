@@ -1,7 +1,10 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Documents;
 using System.Windows.Media;
 using Markdig;
+using Markdig.Renderers;
+using Markdig.Extensions.TaskLists;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 using MediaBrush = System.Windows.Media.Brush;
@@ -14,12 +17,13 @@ using WpfBrushes = System.Windows.Media.Brushes;
 namespace VSticky.Services;
 
 /// <summary>
-/// 常用 Markdown → FlowDocument（预览用，链接不可点击）。
+/// Markdown 和常见 HTML → 原生 FlowDocument（预览用，链接不可点击）。
 /// </summary>
 public static class MarkdownRenderer
 {
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseEmphasisExtras()
+        .UseTaskLists()
         .UseSoftlineBreakAsHardlineBreak()
         .Build();
 
@@ -51,7 +55,7 @@ public static class MarkdownRenderer
 
         var parsed = Markdown.Parse(text, Pipeline);
         foreach (var block in parsed)
-            AppendBlock(doc, block, family, fontSize, foreground);
+            AppendBlock(doc.Blocks, block, family, fontSize, foreground);
 
         if (doc.Blocks.Count == 0)
             doc.Blocks.Add(new Paragraph(new Run(text)) { Margin = new Thickness(0) });
@@ -60,7 +64,7 @@ public static class MarkdownRenderer
     }
 
     private static void AppendBlock(
-        FlowDocument doc,
+        BlockCollection blocks,
         MdBlock block,
         MediaFontFamily family,
         double fontSize,
@@ -72,22 +76,22 @@ public static class MarkdownRenderer
             {
                 var p = CreateParagraph(heading, family, fontSize, foreground);
                 p.FontWeight = FontWeights.SemiBold;
-                p.FontSize = fontSize * heading.Level switch
+                p.FontSize = fontSize * (heading.Level switch
                 {
                     1 => 1.45,
                     2 => 1.28,
                     3 => 1.14,
                     _ => 1.05
-                };
+                });
                 p.Margin = new Thickness(0, heading.Level == 1 ? 2 : 6, 0, 4);
-                doc.Blocks.Add(p);
+                blocks.Add(p);
                 break;
             }
             case ParagraphBlock paragraph:
             {
                 var p = CreateParagraph(paragraph, family, fontSize, foreground);
                 p.Margin = new Thickness(0, 0, 0, 6);
-                doc.Blocks.Add(p);
+                blocks.Add(p);
                 break;
             }
             case QuoteBlock quote:
@@ -100,17 +104,18 @@ public static class MarkdownRenderer
                     Margin = new Thickness(0, 2, 0, 8)
                 };
                 foreach (var child in quote)
-                    AppendBlockToSection(section, child, family, fontSize, foreground);
-                doc.Blocks.Add(section);
+                    AppendBlock(section.Blocks, child, family, fontSize, foreground);
+                blocks.Add(section);
                 break;
             }
             case ListBlock list:
             {
-                var listItemIndex = 1;
+                var listItemIndex = int.TryParse(list.OrderedStart, out var firstIndex) ? firstIndex : 1;
                 foreach (var item in list)
                 {
                     if (item is not ListItemBlock listItem) continue;
-                    var prefix = list.IsOrdered ? $"{listItemIndex}. " : "• ";
+                    var task = (listItem.FirstOrDefault() as ParagraphBlock)?.Inline?.FirstChild is TaskList;
+                    var prefix = task ? "" : list.IsOrdered ? $"{listItemIndex}. " : "• ";
                     var p = new Paragraph
                     {
                         Margin = new Thickness(8, 0, 0, 2),
@@ -135,7 +140,13 @@ public static class MarkdownRenderer
                             first = false;
                         }
                     }
-                    doc.Blocks.Add(p);
+                    blocks.Add(p);
+                    foreach (var child in listItem.Where(child => child is ContainerBlock))
+                    {
+                        var nested = new Section { Margin = new Thickness(16, 0, 0, 0) };
+                        blocks.Add(nested);
+                        AppendBlock(nested.Blocks, child, family, fontSize, foreground);
+                    }
                     listItemIndex++;
                 }
                 break;
@@ -143,40 +154,21 @@ public static class MarkdownRenderer
             case FencedCodeBlock code:
             {
                 var content = code.Lines.ToString().TrimEnd('\r', '\n');
-                var p = new Paragraph(new Run(content)
-                {
-                    FontFamily = new MediaFontFamily("Consolas, Cascadia Mono, Courier New"),
-                    FontSize = Math.Max(11, fontSize - 1)
-                })
-                {
-                    Background = new SolidColorBrush(MediaColor.FromArgb(0x28, 0x00, 0x00, 0x00)),
-                    Padding = new Thickness(8, 6, 8, 6),
-                    Margin = new Thickness(0, 2, 0, 8),
-                    Foreground = foreground
-                };
-                doc.Blocks.Add(p);
+                blocks.Add(CreateCodeParagraph(content, code.Info, fontSize, foreground));
                 break;
             }
             case CodeBlock plainCode:
             {
                 var content = plainCode.Lines.ToString().TrimEnd('\r', '\n');
-                var p = new Paragraph(new Run(content)
-                {
-                    FontFamily = new MediaFontFamily("Consolas, Cascadia Mono, Courier New"),
-                    FontSize = Math.Max(11, fontSize - 1)
-                })
-                {
-                    Background = new SolidColorBrush(MediaColor.FromArgb(0x28, 0x00, 0x00, 0x00)),
-                    Padding = new Thickness(8, 6, 8, 6),
-                    Margin = new Thickness(0, 2, 0, 8),
-                    Foreground = foreground
-                };
-                doc.Blocks.Add(p);
+                blocks.Add(CreateCodeParagraph(content, null, fontSize, foreground));
                 break;
             }
+            case HtmlBlock html:
+                HtmlFragmentRenderer.AppendBlocks(blocks, html.Lines.ToString(), family, fontSize, foreground);
+                break;
             case ThematicBreakBlock:
             {
-                doc.Blocks.Add(new BlockUIContainer(new System.Windows.Controls.Border
+                blocks.Add(new BlockUIContainer(new System.Windows.Controls.Border
                 {
                     Height = 1,
                     Background = new SolidColorBrush(MediaColor.FromArgb(0x40, 0x00, 0x00, 0x00)),
@@ -188,30 +180,29 @@ public static class MarkdownRenderer
             {
                 var p = CreateParagraph(leaf, family, fontSize, foreground);
                 p.Margin = new Thickness(0, 0, 0, 6);
-                doc.Blocks.Add(p);
+                blocks.Add(p);
                 break;
             }
         }
     }
 
-    private static void AppendBlockToSection(
-        Section section,
-        MdBlock block,
-        MediaFontFamily family,
-        double fontSize,
-        MediaBrush foreground)
+    internal static Paragraph CreateCodeParagraph(string content, string? language, double fontSize, MediaBrush foreground)
     {
-        if (block is LeafBlock leaf && leaf.Inline != null)
+        var p = new Paragraph
         {
-            var p = CreateParagraph(leaf, family, fontSize, foreground);
-            p.Margin = new Thickness(0, 0, 0, 4);
-            section.Blocks.Add(p);
-        }
-        else if (block is ContainerBlock container)
+            Background = new SolidColorBrush(MediaColor.FromArgb(0x28, 0x00, 0x00, 0x00)),
+            Padding = new Thickness(8, 6, 8, 6),
+            Margin = new Thickness(0, 2, 0, 8),
+            Foreground = foreground
+        };
+        var code = new Span
         {
-            foreach (var child in container)
-                AppendBlockToSection(section, child, family, fontSize, foreground);
-        }
+            FontFamily = new MediaFontFamily("Consolas, Cascadia Mono, Courier New"),
+            FontSize = Math.Max(11, fontSize - 1)
+        };
+        CodeHighlighter.Append(code.Inlines, content, language, foreground);
+        p.Inlines.Add(code);
+        return p;
     }
 
     private static Paragraph CreateParagraph(
@@ -239,6 +230,17 @@ public static class MarkdownRenderer
         double fontSize,
         MediaBrush foreground)
     {
+        if (ContainsHtml(inline))
+        {
+            using var writer = new StringWriter();
+            var renderer = new HtmlRenderer(writer);
+            Pipeline.Setup(renderer);
+            for (var current = inline; current != null; current = current.NextSibling)
+                renderer.Render(current);
+            HtmlFragmentRenderer.AppendInlines(target, writer.ToString(), fontSize);
+            return;
+        }
+
         for (var current = inline; current != null; current = current.NextSibling)
         {
             switch (current)
@@ -246,12 +248,20 @@ public static class MarkdownRenderer
                 case LiteralInline literal:
                     target.Add(new Run(literal.Content.ToString()) { Foreground = foreground });
                     break;
+                case TaskList task:
+                    target.Add(new Run(task.Checked ? "☑ " : "☐ ") { Foreground = foreground });
+                    break;
                 case EmphasisInline emphasis:
                 {
                     var span = new Span { Foreground = foreground };
                     if (emphasis.DelimiterChar == '~')
                     {
                         span.TextDecorations = TextDecorations.Strikethrough;
+                    }
+                    else if (emphasis.DelimiterChar == '=')
+                    {
+                        span.Background = WpfBrushes.Yellow;
+                        span.Foreground = WpfBrushes.Black;
                     }
                     else
                     {
@@ -261,7 +271,7 @@ public static class MarkdownRenderer
                             span.FontStyle = FontStyles.Italic;
                     }
 
-                    AppendInlines(span.Inlines, emphasis.FirstChild, family, fontSize, foreground);
+                    AppendInlines(span.Inlines, emphasis.FirstChild, family, fontSize, span.Foreground);
                     target.Add(span);
                     break;
                 }
@@ -299,5 +309,15 @@ public static class MarkdownRenderer
                     break;
             }
         }
+    }
+
+    private static bool ContainsHtml(MdInline? inline)
+    {
+        for (var current = inline; current != null; current = current.NextSibling)
+        {
+            if (current is HtmlInline) return true;
+            if (current is ContainerInline container && ContainsHtml(container.FirstChild)) return true;
+        }
+        return false;
     }
 }

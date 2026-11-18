@@ -213,10 +213,8 @@ public static class Loc
     {
         var baseDir = AppContext.BaseDirectory;
         yield return Path.Combine(baseDir, "Locales");
-        yield return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "VSticky",
-            "Locales");
+        yield return AppPaths.LocalesDirectory;
+        yield return Path.Combine(AppPaths.LegacyRoamingDirectory, "Locales");
     }
 
     private static string? Normalize(string? code)
